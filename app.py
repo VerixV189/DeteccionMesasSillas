@@ -8,8 +8,8 @@ load_dotenv()
 # --- FIN DE LA CORRECCIÓN ---
 
 # Ahora os.getenv('FLASK_ENV') funcionará correctamente
+#gunicorn -w 4 app:app --bind 0.0.0.0:8000
 config_name = os.getenv('FLASK_ENV', 'development')
-
 app = create_app(config_name)
 
 if __name__ == '__main__':

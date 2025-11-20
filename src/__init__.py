@@ -36,10 +36,12 @@ def create_app(config_name='default'):
 
     from .routes.layout_routes import layout_bp
     from .routes.reserva_routes import reserva_bp
+    from .routes.test_router import test_bp
     from . import models 
 
     # Registrar los Blueprints
     app.register_blueprint(layout_bp, url_prefix='/api/layout')
     app.register_blueprint(reserva_bp, url_prefix='/api/reserva')
+    app.register_blueprint(test_bp,url_prefix='/api/test')
     
     return app
