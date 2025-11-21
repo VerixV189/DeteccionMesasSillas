@@ -106,6 +106,7 @@ def reservar_mesa():
 
     reservas_conflictivas = db.session.query(Reserva).join(Reserva.mesas).filter(
         Mesa.id_str == table_id,
+        Reserva.status == 'activa',
         Reserva.reservation_time < target_end_time,
         Reserva.reservation_time > earliest_start_time
     ).count()
@@ -170,6 +171,7 @@ def reservar_cluster():
 
     reservas_conflictivas = db.session.query(Reserva).join(Reserva.mesas).filter(
         Mesa.id_str.in_(table_ids),
+        Reserva.status == 'activa',
         Reserva.reservation_time < target_end_time,
         Reserva.reservation_time > earliest_start_time
     ).count()
