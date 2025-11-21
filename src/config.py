@@ -1,8 +1,10 @@
 import os
 
+from dotenv import load_dotenv
+
 # Obtener la ruta base del proyecto
 basedir = os.path.abspath(os.path.dirname(__file__))
-
+load_dotenv()
 class Config:
     """Configuración base, compartida por todos los entornos."""
     # Lee la SECRET_KEY desde el entorno, con un valor por defecto por si no existe.
