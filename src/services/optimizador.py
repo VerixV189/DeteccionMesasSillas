@@ -765,27 +765,34 @@ def planificar_cluster_para_cliente(mesas_libres, party_size):
     
     return None, "No se pudo formar un clúster con la capacidad requerida."
 
-def generar_layout_simulado_para_hora(target_time):
+def generar_layout_simulado_para_hora(target_time, layout_id=None):
     """
-    Genera una representación JSON del layout del restaurante para una hora específica,
-    simulando el estado de todas las reservas activas en ese momento.
-    Parámetros:
-    - target_time: datetime object que representa la hora objetivo para la simulación.
+    Genera una representación JSON del layout para una hora específica.
+    Si se provee un layout_id, usa ese layout. Si no, usa el que esté activo.
     """
     RESERVATION_DURATION = timedelta(minutes=120)
     target_end_time = target_time + RESERVATION_DURATION
     earliest_start_time = target_time - RESERVATION_DURATION
 
-    layout_db = Layout.query.first()
+    layout_db = None
+    if layout_id:
+        # --- CAMBIO: Si se pasa un ID, buscar ese layout específico ---
+        layout_db = Layout.query.get(layout_id)
+        if not layout_db:
+            return None, f"No se encontró el layout con ID {layout_id}."
+    else:
+        # --- Lógica existente: Buscar el layout activo ---
+        layout_db = Layout.query.filter_by(is_active=True).first()
+    
     if not layout_db:
-        return None, "No hay ningún layout configurado en el sistema."
+        return None, "No hay ningún layout activo configurado en el sistema."
 
-    # Construir el layout base desde la BD
+    # Construir el layout base desde la BD (sin cambios)
     layout_base = {
         "dimensions": {"width_px": layout_db.width_px, "height_px": layout_db.height_px, "width_m": layout_db.width_m, "height_m": layout_db.height_m},
         "objects": {
             mesa.id_str: {
-                "id": mesa.id_str, "tipo": mesa.tipo, "estado": 'libre',
+                "id": mesa.id_str, "tipo": mesa.tipo, "estado": 'libre', # El estado base siempre es 'libre'
                 "capacidad_actual": mesa.capacidad_actual, "coords_mesa_metros": mesa.coords_mesa_metros,
                 "coords_mesa_pixeles": mesa.coords_mesa_pixeles,
                 "sillas_asignadas": [{"id_silla": s.id_str, "coords_pixeles": s.coords_pixeles, "coords_metros": s.coords_metros, "tipo": s.tipo} for s in mesa.sillas]
@@ -795,7 +802,9 @@ def generar_layout_simulado_para_hora(target_time):
     }
     
     # Obtener todas las reservas que se solapan con el tiempo deseado
+    # Y que PERTENECEN EXCLUSIVAMENTE al layout que se está simulando.
     reservas_activas = db.session.query(Reserva).filter(
+        Reserva.layout_id == layout_db.id, # <-- ESTA ES LA LÍNEA CLAVE
         Reserva.status == 'activa',
         Reserva.reservation_time < target_end_time,
         Reserva.reservation_time > earliest_start_time

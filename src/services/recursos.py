@@ -1,6 +1,7 @@
 import math
 import cv2
 import numpy as np
+import uuid
 
 def procesar_detecciones(results, local_ancho_m, local_alto_m, filtros_m,):
     """
@@ -15,9 +16,6 @@ def procesar_detecciones(results, local_ancho_m, local_alto_m, filtros_m,):
     lista_mesas = []
     lista_sillas = []
     classNames = getattr(results, "names", {}) or {}
-
-    mesa_counter = 0
-    silla_counter = 0
 
     # 1. Calcular el factor de escala (píxeles por metro)
     try:
@@ -67,13 +65,15 @@ def procesar_detecciones(results, local_ancho_m, local_alto_m, filtros_m,):
             }
 
             if es_mesa:
-                item['id_mesa'] = f"M{mesa_counter}"
+                # Generar un ID único y corto para la mesa
+                item['id_mesa'] = f"M-{uuid.uuid4().hex[:6]}"
                 lista_mesas.append(item)
-                mesa_counter += 1
+                # mesa_counter += 1 # Eliminado
             elif es_silla:
-                item['id_silla'] = f"S{silla_counter}"
+                # Generar un ID único y corto para la silla
+                item['id_silla'] = f"S-{uuid.uuid4().hex[:6]}"
                 lista_sillas.append(item)
-                silla_counter += 1
+                # silla_counter += 1 # Eliminado
 
     return lista_mesas, lista_sillas
 

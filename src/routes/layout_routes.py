@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from PIL import Image
 import os
 import json
+from datetime import datetime
 
 from ..services.recursos import procesar_detecciones, agrupar_mesas_sillas
 from ..services.perimetro import detectar_perimetro
@@ -98,17 +99,23 @@ def save_layout():
         
     data = body.get('layout', body)
     
-    Layout.query.delete()
-    db.session.commit()
-    
+    try:
+        db.session.query(Layout).update({Layout.is_active: False})
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error al desactivar layouts antiguos: {e}")
+        return jsonify({"error": "No se pudieron desactivar los layouts antiguos."}), 500
+
     new_layout = Layout(
-        name="Plano Principal",
+        name=f"Plano Principal v{datetime.utcnow().strftime('%Y%m%d%H%M%S')}", # Nombre único
         width_px=data['dimensions']['width_px'],
         height_px=data['dimensions']['height_px'],
         width_m=data['dimensions']['width_m'],
         height_m=data['dimensions']['height_m'],
         m_to_px=data.get('m_to_px', 20.0),
-        perimeter_json=json.dumps(data['perimeter']['points'])
+        perimeter_json=json.dumps(data['perimeter']['points']),
+        is_active=True # Se establece como el layout activo
     )
     db.session.add(new_layout)
     
@@ -144,6 +151,17 @@ def save_layout():
                 db.session.add(new_silla)
 
     db.session.commit()
+
+    try:
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        if os.path.exists(upload_folder):
+            for filename in os.listdir(upload_folder):
+                file_path = os.path.join(upload_folder, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+    except Exception as e:
+        current_app.logger.error(f"Error al limpiar la carpeta de subidas: {e}")
+
     return jsonify({"message": "Layout completo guardado en la base de datos con éxito."}), 201
 
 @layout_bp.route('/<int:layout_id>', methods=['GET'])

@@ -8,7 +8,7 @@ from ..services.optimizador import (
     planificar_cluster_para_cliente, _get_geometric_layout, generar_layout_simulado_para_hora
 )
 from .. import db
-from ..models import Mesa, Reserva
+from ..models import Mesa, Reserva, Layout
 
 reserva_bp = Blueprint('reserva_bp', __name__)
 
@@ -86,7 +86,7 @@ def reservar_mesa():
     try:
         data = request.get_json()
         table_id = data['table_id']
-        user_info = data.get('user_info', {})
+        user_id = data.get('user_id', 'Cliente Anónimo')
         reservation_time_str = data.get('reservation_time')
         if reservation_time_str:
             # Formato: "2025-11-17T22:00"
@@ -120,10 +120,11 @@ def reservar_mesa():
     # 3. Crear la reserva SIN plan de movimiento y asociarla a la mesa.
     try:
         nueva_reserva = Reserva(
-            user_id=user_info.get('id'),
+            user_id=user_id,
             num_people=mesa_a_reservar.capacidad_actual,
-            reservation_time=target_time, # <-- Se guarda la hora correcta
-            movimiento_info_json=None
+            reservation_time=target_time,
+            movimiento_info_json=None,
+            layout_id=mesa_a_reservar.layout_id
         )
         nueva_reserva.mesas.append(mesa_a_reservar)
         db.session.add(nueva_reserva)
@@ -202,6 +203,10 @@ def reservar_cluster():
 
     # 4. Guardar la reserva en la base de datos (lógica sin cambios, pero ahora es segura).
     try:
+        mesas_a_asociar = Mesa.query.filter(Mesa.id_str.in_(table_ids)).all()
+        if not mesas_a_asociar:
+            return jsonify({"error": "No se encontraron las mesas para asociar a la reserva."}), 404
+
         movimiento_info = {
             'k': len(table_ids), 'mesas_ids': table_ids, 'sillas_ids': [s['id_silla'] for s in sillas_finales_data],
             'destino': { 'centro_x': movimiento_destino['centro'].x, 'centro_y': movimiento_destino['centro'].y, 'orientacion': movimiento_destino['orientacion'] }, 
@@ -212,7 +217,8 @@ def reservar_cluster():
             user_id=user_id, 
             num_people=num_people,
             reservation_time=target_time,
-            movimiento_info_json=movimiento_info
+            movimiento_info_json=movimiento_info,
+            layout_id=mesas_a_asociar[0].layout_id
         )
         
         mesas_a_asociar = Mesa.query.filter(Mesa.id_str.in_(table_ids)).all()
@@ -277,22 +283,25 @@ def get_user_reservations(user_id):
 @reserva_bp.route('/<int:reserva_id>', methods=['GET'])
 def show_reservation(reserva_id):
     """
-    Muestra los detalles de una reserva específica, incluyendo el layout simulado.
+    Muestra los detalles de una reserva específica, incluyendo el layout simulado
+    correspondiente a la versión del plano en que se hizo la reserva.
     """
     try:
         reserva = Reserva.query.get(reserva_id)
         if not reserva:
             return jsonify({"error": "No se pudo encontrar la reserva solicitada."}), 404
 
-        # --- INICIO DE LA MODIFICACIÓN ---
         # Obtener una lista de objetos con el id y la capacidad de cada mesa.
         reserved_tables_info = [
             {'id': mesa.id_str, 'capacity': mesa.capacidad_actual} 
             for mesa in reserva.mesas
         ]
 
-        # Generar el layout para la hora de la reserva (nombre corregido)
-        layout_simulado, error_msg = generar_layout_simulado_para_hora(reserva.reservation_time)
+        # --- CAMBIO: Pasar el layout_id de la reserva a la función de simulación ---
+        layout_simulado, error_msg = generar_layout_simulado_para_hora(
+            reserva.reservation_time, 
+            layout_id=reserva.layout_id
+        )
         if error_msg:
             return jsonify({"error": error_msg}), 500
 
@@ -301,7 +310,7 @@ def show_reservation(reserva_id):
             'reservation_time': reserva.reservation_time.isoformat(),
             'num_people': reserva.num_people,
             'status': reserva.status,
-            'tables': reserved_tables_info, # <-- Se devuelve la lista de objetos
+            'tables': reserved_tables_info,
             'layout': layout_simulado
         })
 

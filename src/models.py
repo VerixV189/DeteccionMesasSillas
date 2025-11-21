@@ -16,7 +16,8 @@ class Layout(db.Model):
     width_m = db.Column(db.Float, nullable=False)
     height_m = db.Column(db.Float, nullable=False)
     m_to_px = db.Column(db.Float, nullable=False)
-    perimeter_json = db.Column(db.Text) # Guardar el perímetro como un string JSON
+    perimeter_json = db.Column(db.Text) 
+    is_active = db.Column(db.Boolean, default=True, nullable=False) 
     mesas = db.relationship('Mesa', backref='layout', lazy=True, cascade="all, delete-orphan")
 
 class Mesa(db.Model):
@@ -48,6 +49,7 @@ class Silla(db.Model):
 class Reserva(db.Model):
     __tablename__ = 'reserva'
     id = db.Column(db.Integer, primary_key=True)
+    layout_id = db.Column(db.Integer, db.ForeignKey('layout.id'), nullable=False)
     user_id = db.Column(db.String(100))
     num_people = db.Column(db.Integer)
     reservation_time = db.Column(db.DateTime, default=datetime.utcnow)
