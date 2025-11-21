@@ -57,7 +57,7 @@ def detect_objects():
     try:
         m_to_px_scale = float(ancho_plano_pixeles) / float(local_ancho_m)
     except (TypeError, ZeroDivisionError):
-        m_to_px_scale = 20.0 # Un fallback por si acaso
+        m_to_px_scale = 20.0 
 
     layout_data = {
         "dimensions": {
@@ -70,39 +70,33 @@ def detect_objects():
         "perimeter": {
             "points": poligono_perimetro
         },
-        # Añadir el factor de escala al diccionario para que el optimizador lo use.
         "m_to_px": m_to_px_scale 
     }
-
-    # Guardar en el caché de la aplicación en lugar de layout_state
-    current_app.layout_cache = layout_data
 
     return jsonify(layout_data), 200
 
 @layout_bp.route('/optimize', methods=['POST'])
 def optimize_current_layout():
     """
-    Toma el layout actual almacenado en el caché de la aplicación, lo optimiza y lo devuelve.
+    Toma un layout enviado en el cuerpo de la petición, lo optimiza y lo devuelve.
     """
+    body = request.get_json()
+    if not body:
+        return jsonify({"error": "No se enviaron datos de layout en el cuerpo de la petición."}), 400
     
-    if not current_app.layout_cache:
-        return jsonify({"error": "No hay un layout en caché para optimizar."}), 409 # 409 Conflict
+    layout_a_optimizar = body.get('layout', body)
     
-    # Llama a la función de optimización con el estado actual
-    layout_optimizado = optimizar_layout_completo(current_app.layout_cache)
+    layout_optimizado = optimizar_layout_completo(layout_a_optimizar)
     
-    # Actualiza el caché de la aplicación con el nuevo layout optimizado
-    current_app.layout_cache = layout_optimizado
-    
-    # Devuelve el layout optimizado al frontend
     return jsonify(layout_optimizado), 200
 
 @layout_bp.route('', methods=['POST'])
 def save_layout():
-    if not current_app.layout_cache:
-        return jsonify({"error": "No hay layout en caché para guardar."}), 400
-
-    data = current_app.layout_cache
+    body = request.get_json()
+    if not body:
+        return jsonify({"error": "No hay layout en el cuerpo de la petición para guardar."}), 400
+        
+    data = body.get('layout', body)
     
     Layout.query.delete()
     db.session.commit()
@@ -118,7 +112,6 @@ def save_layout():
     )
     db.session.add(new_layout)
     
-    # --- INICIO DE LA CORRECCIÓN: GUARDAR TODOS LOS DATOS SIN CÁLCULOS ---
     for obj_id, obj_data in data.get('objects', {}).items():
         if obj_data.get('tipo', '').startswith('mesa'):
             new_mesa = Mesa(
@@ -155,6 +148,4 @@ def save_layout():
 
 @layout_bp.route('/<int:layout_id>', methods=['GET'])
 def load_layout(layout_id):
-    # Aquí iría la lógica para leer desde la BD y construir el JSON
-    # ...
     return jsonify({"message": "Función para cargar no implementada aún."})

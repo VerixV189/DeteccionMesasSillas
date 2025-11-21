@@ -20,7 +20,7 @@ def create_app(config_name='default'):
     db.init_app(app)
     migrate.init_app(app, db)
 
-    CORS(app, resources={r"/api/*": {"origins": ["http://localhost:8000", "http://127.0.0.1:8000"]}})
+    CORS(app, resources={r"/api/*": {"origins": ["*"]}})
     
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -39,7 +39,6 @@ def create_app(config_name='default'):
     from .routes.test_router import test_bp
     from . import models 
 
-    # Registrar los Blueprints
     app.register_blueprint(layout_bp, url_prefix='/api/layout')
     app.register_blueprint(reserva_bp, url_prefix='/api/reserva')
     app.register_blueprint(test_bp,url_prefix='/api/test')
